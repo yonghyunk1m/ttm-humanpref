@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Improving Text-to-Music Generation with Human Preference Rewards &mdash; Demo</title>
+<style>
+  /* CMU palette */
+  :root {
+    --cmu-red:    #C41230;  /* Cardinal */
+    --cmu-red-dk: #8C0F23;
+    --cmu-gray:   #54585A;  /* Steel */
+    --cmu-iron:   #6D6E71;
+    --cmu-gold:   #FFCD00;
+    --fg:         #1a1a1a;
+    --muted:      var(--cmu-iron);
+    --border:     #d8d8d8;
+    --bg:         #ffffff;
+    --bg-soft:    #f4f4f5;
+    --accent-bg:  #fbe9eb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 32px 24px 64px;
+    line-height: 1.55;
+  }
+  header {
+    border-top: 4px solid var(--cmu-red);
+    padding-top: 18px;
+    margin-bottom: 18px;
+  }
+  h1 {
+    font-size: 26px;
+    margin: 0 0 8px;
+    color: var(--cmu-red);
+    letter-spacing: -0.005em;
+  }
+  h2 {
+    font-size: 17px;
+    margin: 30px 0 10px;
+    color: var(--cmu-gray);
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 6px;
+    letter-spacing: 0.01em;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+  .lead { color: var(--cmu-gray); margin: 0 0 20px; font-size: 15px; }
+  .meta { font-size: 13.5px; color: var(--cmu-gray); margin: 0 0 12px; }
+  .meta strong { color: var(--fg); }
+
+  /* Tab strip */
+  .tab-strip {
+    display: flex;
+    gap: 4px;
+    border-bottom: 2px solid var(--cmu-gray);
+    margin: 24px 0 0;
+  }
+  .tab-btn {
+    border: none;
+    background: var(--bg-soft);
+    color: var(--cmu-gray);
+    padding: 10px 18px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 6px 6px 0 0;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: background 0.12s, color 0.12s;
+    letter-spacing: 0.01em;
+  }
+  .tab-btn:hover {
+    background: #e9e9eb;
+    color: var(--fg);
+  }
+  .tab-btn.active {
+    background: var(--cmu-red);
+    color: #ffffff;
+    border-bottom-color: var(--cmu-red);
+  }
+  .tab-panel { display: none; padding-top: 18px; }
+  .tab-panel.active { display: block; }
+
+  /* Featured cards */
+  .featured-list {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    margin-top: 4px;
+  }
+  .case {
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--cmu-red);
+    border-radius: 6px;
+    padding: 18px 22px 20px;
+  }
+  .case .case-prompt {
+    font-size: 14.5px;
+    color: var(--fg);
+    margin: 0 0 14px;
+    line-height: 1.5;
+  }
+  .case .case-prompt .case-id {
+    display: inline-block;
+    background: var(--cmu-red);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    padding: 2px 8px;
+    border-radius: 3px;
+    margin-right: 10px;
+    vertical-align: middle;
+  }
+  .pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .pair .col {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 12px 14px;
+  }
+  .pair .col.win {
+    background: var(--accent-bg);
+    border-color: var(--cmu-red);
+  }
+  .pair .col-label {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--cmu-gray);
+    margin-bottom: 8px;
+  }
+  .pair .col.win .col-label { color: var(--cmu-red); }
+  .pair audio { width: 100%; height: 32px; display: block; margin-bottom: 8px; }
+  .scores {
+    font-size: 12px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.45;
+  }
+  .scores b { color: var(--fg); font-weight: 600; }
+  .scores .label { color: var(--muted); }
+  .scores .row { display: flex; justify-content: space-between; }
+  .delta {
+    display: inline-block;
+    background: var(--cmu-red);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 3px;
+    margin-left: 8px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Full table (All samples tab) */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 12px;
+    background: var(--bg);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  th, td {
+    text-align: left;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  th {
+    background: var(--cmu-gray);
+    color: white;
+    font-weight: 600;
+    font-size: 13px;
+    letter-spacing: 0.02em;
+  }
+  th:first-child, td.idx {
+    width: 40px; text-align: center;
+  }
+  td.idx { font-weight: 600; color: var(--cmu-red); }
+  td.prompt { font-size: 13.5px; line-height: 1.45; min-width: 280px; }
+  td.audio { width: 240px; }
+  td.audio audio { width: 100%; height: 32px; display: block; }
+
+  ul.systems { padding-left: 20px; margin: 8px 0 14px; }
+  ul.systems li { margin: 4px 0; }
+  ul.systems strong { color: var(--cmu-red); }
+
+  footer {
+    margin-top: 48px;
+    padding-top: 20px;
+    border-top: 4px solid var(--cmu-red);
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  @media (max-width: 700px) {
+    .pair { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Improving Text-to-Music Generation with Human Preference Rewards</h1>
+  <p class="meta">
+    Audio demo for our submission to the
+    <a href="https://ntu-musicailab.github.io/ICME26-ATTM-Grand-Challenge/">ICME 2026 ATTM Grand Challenge (Efficiency Track)</a>.
+    Code: <a href="https://github.com/yonghyunk1m/ttm-humanpref">github.com/yonghyunk1m/ttm-humanpref</a>.
+  </p>
+  <p class="lead">
+    Audio samples from the two submitted configurations alongside the
+    challenge-provided FluxAudio-S baseline. <strong>Baseline</strong> is
+    the official 120 M FluxAudio-S checkpoint: text-conditioned on T5 +
+    LAION-CLAP-Music features but trained without our score-conditioning
+    head, expert iteration, CRPO pass, or inference post-processing.
+    <strong>Sub.&nbsp;1</strong> and <strong>Sub.&nbsp;2</strong> are the
+    full submitted pipeline (score-conditioned SFT + expert iteration +
+    v1&rarr;v2 cross-loading + CRPO, followed by 3&times;Demucs and
+    LUFS&minus;16.5) at seeds&nbsp;42 and&nbsp;55 respectively. All audio
+    is mono, 44.1&thinsp;kHz, 10&nbsp;seconds.
+  </p>
+  <p class="meta">
+    <strong>CLAP-text</strong> is the cosine similarity between the prompt
+    and the generated audio in the LAION-CLAP space (higher is better).
+    <strong>Reward</strong> is the TuneJury preference scalar trained on
+    four open music-preference corpora (higher is better; typical range
+    approximately &minus;2 to +2).
+  </p>
+</header>
+
+<div class="tab-strip" role="tablist">
+  <button class="tab-btn active" role="tab" data-tab="featured" id="tab-btn-featured">Featured cases</button>
+  <button class="tab-btn" role="tab" data-tab="all" id="tab-btn-all">All samples</button>
+</div>
+
+<section class="tab-panel active" id="tab-featured" role="tabpanel" aria-labelledby="tab-btn-featured">
+  <p class="meta" style="margin-top: 18px;">
+    Prompts (subset with computed scores) where our submission improved
+    the TuneJury reward most over the baseline. For each
+    case we show the best of Sub.&nbsp;1 / Sub.&nbsp;2 on the right; the
+    <strong>&Delta;reward</strong> badge is our submission's reward minus
+    the baseline's.
+  </p>
+  <div class="featured-list" id="featured"></div>
+</section>
+
+<section class="tab-panel" id="tab-all" role="tabpanel" aria-labelledby="tab-btn-all">
+  <p class="meta" style="margin-top: 18px;">
+    All 100 evaluation prompts with all three systems side by side.
+    CLAP / Reward scores shown for the 10-prompt scored subset; remaining
+    prompts list audio only.
+  </p>
+  <table id="samples">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Prompt</th>
+        <th>Baseline</th>
+        <th>Sub.&nbsp;1 (seed&nbsp;42)</th>
+        <th>Sub.&nbsp;2 (seed&nbsp;55)</th>
+      </tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+</section>
+
+<footer>
+  <p>
+    Audio demo for our submission to ICME&nbsp;2026 ATTM Grand Challenge.
+    See <a href="https://github.com/yonghyunk1m/ttm-humanpref">the GitHub repository</a> for code and pre-trained checkpoints.
+  </p>
+</footer>
+
+<script>
+  function fmt(score) {
+    if (score === undefined || score === null || Number.isNaN(score)) return "n/a";
+    const sign = score >= 0 ? "+" : "";
+    return sign + score.toFixed(3);
+  }
+  function fmtDelta(d) {
+    const sign = d >= 0 ? "+" : "−";
+    return sign + Math.abs(d).toFixed(2);
+  }
+
+  // Tab switching
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = btn.dataset.tab;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + target));
+    });
+  });
+
+  // Featured cases: prompts with computed scores, ranked by reward delta
+  // (max(sub1, sub2) − baseline). Show up to FEATURED_TOP_N highest.
+  const FEATURED_TOP_N = 10;
+
+  Promise.all([
+    fetch('prompts.json').then(r => r.json()),
+    fetch('clap_scores.json').then(r => r.json()),
+    fetch('reward_scores.json').then(r => r.json())
+  ]).then(([rows, clap, rew]) => {
+    // ---- Featured tab: only prompts with full score data ----
+    const ranked = rows
+      .filter(({id}) => rew[String(id)] && rew[String(id)].baseline !== undefined)
+      .map(({id, prompt}) => {
+        const r = rew[String(id)] || {};
+        const c = clap[String(id)] || {};
+        const bestSub = (r.sub1 ?? -Infinity) >= (r.sub2 ?? -Infinity) ? 'sub1' : 'sub2';
+        const dReward = (r[bestSub] ?? 0) - (r.baseline ?? 0);
+        return { id, prompt, r, c, bestSub, dReward };
+      })
+      .sort((a, b) => b.dReward - a.dReward);
+
+    const top = ranked.slice(0, FEATURED_TOP_N);
+    const featDiv = document.getElementById('featured');
+    top.forEach(({id, prompt, r, c, bestSub, dReward}) => {
+      const subLabel = bestSub === 'sub1' ? 'Sub.&nbsp;1 (seed&nbsp;42)' : 'Sub.&nbsp;2 (seed&nbsp;55)';
+      const case_ = document.createElement('article');
+      case_.className = 'case';
+      case_.innerHTML = `
+        <p class="case-prompt"><span class="case-id">PROMPT ${id}</span>${prompt}</p>
+        <div class="pair">
+          <div class="col">
+            <div class="col-label">Baseline (FluxAudio-S, no score conditioning)</div>
+            <audio controls preload="none" src="audio/baseline/${id}.wav"></audio>
+            <div class="scores">
+              <div class="row"><span class="label">CLAP-text</span><b>${fmt(c.baseline)}</b></div>
+              <div class="row"><span class="label">Reward</span><b>${fmt(r.baseline)}</b></div>
+            </div>
+          </div>
+          <div class="col win">
+            <div class="col-label">${subLabel}<span class="delta">&Delta;reward ${fmtDelta(dReward)}</span></div>
+            <audio controls preload="none" src="audio/${bestSub}/${id}.wav"></audio>
+            <div class="scores">
+              <div class="row"><span class="label">CLAP-text</span><b>${fmt(c[bestSub])}</b></div>
+              <div class="row"><span class="label">Reward</span><b>${fmt(r[bestSub])}</b></div>
+            </div>
+          </div>
+        </div>
+      `;
+      featDiv.appendChild(case_);
+    });
+
+    // ---- All samples tab ----
+    const tbody = document.getElementById('rows');
+    rows.forEach(({id, prompt}) => {
+      const c = clap[String(id)] || {};
+      const r = rew[String(id)] || {};
+      const cell = (sys) => `
+        <td class="audio">
+          <audio controls preload="none" src="audio/${sys}/${id}.wav"></audio>
+          <div class="scores">
+            <div class="row"><span class="label">CLAP-text</span><b>${fmt(c[sys])}</b></div>
+            <div class="row"><span class="label">Reward</span><b>${fmt(r[sys])}</b></div>
+          </div>
+        </td>
+      `;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="idx">${id}</td>
+        <td class="prompt">${prompt}</td>
+        ${cell('baseline')}
+        ${cell('sub1')}
+        ${cell('sub2')}
+      `;
+      tbody.appendChild(tr);
+    });
+  });
+</script>
+
+</body>
+</html>

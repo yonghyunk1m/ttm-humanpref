@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Virtual envs
+venv/
+.venv/
+env/
+.env
+
+# Weights, data, outputs (use GitHub Releases for checkpoints)
+weights/
+checkpoints/
+data/
+exps/
+output/
+logs/
+analysis_results/
+plots/
+*.pt
+*.pth
+*.safetensors
+*.bin
+*.ckpt
+
+# But keep latent-stat sets/ files
+!sets/latent_mean.pt
+!sets/latent_std.pt
+!sets/latent_mean_44k.pt
+!sets/latent_std_44k.pt
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+*.swp
+
+# Local config
+.env.local
+secrets.yaml

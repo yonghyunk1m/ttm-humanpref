@@ -1,0 +1,63 @@
+defaults:
+  - base_config
+  - override data: jamendo_44k
+  - override hydra/job_logging: custom
+  - _self_
+
+hydra:
+  run:
+    dir: ./exps/${exp_id}
+  output_subdir: train-${now:%Y-%m-%d_%H-%M-%S}-hydra
+
+ema:
+  start: 0
+  checkpoint_every: 500
+
+mini_train: False
+example_train: False
+enable_grad_scaler: True
+
+log_text_interval: 50
+log_extra_interval: 5_000
+val_interval: 5_000
+eval_interval: 5_000
+save_eval_interval: 10_000
+save_weights_interval: 1_000
+save_checkpoint_interval: 5_000
+save_copy_iterations: []
+
+batch_size: 16
+eval_batch_size: 4
+grad_accum_steps: 2
+
+num_iterations: 5_000
+learning_rate: 1e-6
+linear_warmup_steps: 100
+
+lr_schedule: constant
+clip_grad_norm: 1.0
+weight_decay: 1.0e-6
+
+use_meanflow: False
+use_repa: False
+use_score: True
+use_crpo: False
+use_nft_offline: True
+null_score_prob: 0.1
+
+# NFT hyperparameters
+nft_beta: 0.2
+nft_advantage_mode: binary      # "binary" (C) or "reward" (B)
+nft_reward_temp: 0.1
+nft_adv_clip_max: 1.0
+
+# Preserve CRPO fields so parent RunnerCRPO __init__ is happy (not actually used)
+crpo_beta: 2000.0
+crpo_lambda_fm: 0.0
+
+data_dim:
+  latent_seq_len: 430
+  latent_dim: 40
+  text_seq_len: 77
+  text_dim: 1024
+  text_c_dim: 512
